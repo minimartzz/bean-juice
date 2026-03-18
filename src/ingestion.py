@@ -5,7 +5,9 @@ Module converts raw JSON coffee dataset into
 searchable ChromaDB vector store.
 
 Components:
-- 
+- load_coffee_documents: Loads JSON entries as page_content text
+- build_vectorstore: Loads the raw documents into ChromaDB
+- load_vectorestore: Load an existing ChromaDB into memory
 """
 import json
 import os
@@ -42,54 +44,54 @@ def load_coffee_documents() -> List[Document]:
   documents = []
   for coffee in coffees:
     page_content = f"""
-    The {coffee['bean']} is a bean from {coffee['Roaster Location']} which originated in {coffee['Coffee Origin']}.
-    Roasted by {coffee['roaster']}. {coffee['Bottom Line']}
+    The {coffee.get('bean', '')} is a bean from {coffee.get('Roaster Location', '')} which originated in {coffee.get('Coffee Origin', '')}.
+    Roasted by {coffee.get('roaster', '')}. {coffee.get('Bottom Line', '')}
 
-    OVERALL RATING: {coffee['rating']}
+    OVERALL RATING: {coffee.get('rating', '')}
 
     Flavor Profile:
-    Roast Level: {coffee['Roast Level']}
-    Agtron: {coffee['agtron']}
-    Aroma: {coffee['Aroma']}
-    Body: {coffee['Body']}
-    Flavor: {coffee['Flavor']}
-    Aftertaste: {coffee['Aftertaste']}
-    With Milk: {coffee['With Milk']}
-    Acidity/ Structure: {coffee["Acidity/Structure"]}
-    Acidity: {coffee["Acidity"]}
+    Roast Level: {coffee.get('Roast Level', '')}
+    Agtron: {coffee.get('Agtron', '')}
+    Aroma: {coffee.get('Aroma', '')}
+    Body: {coffee.get('Body', '')}
+    Flavor: {coffee.get('Flavor', '')}
+    Aftertaste: {coffee.get('Aftertaste', '')}
+    With Milk: {coffee.get('With Milk', '')}
+    Acidity/ Structure: {coffee.get("Acidity/Structure", '')}
+    Acidity: {coffee.get("Acidity", '')}
 
     Blind Assessment
-    {coffee['Blind Assessment']}
+    {coffee.get('Blind Assessment', '')}
 
     Notes
-    {coffee['Notes']}
+    {coffee.get('Notes', '')}
 
     Who Should Drink It
-    {coffee['Who Should Drink It']}
+    {coffee.get('Who Should Drink It', '')}
 
     Coffee Details
-    Price: {coffee['Est Price']}
-    Review Date: {coffee['Review Date']}
+    Price: {coffee.get('Est Price', '')}
+    Review Date: {coffee.get('Review Date', '')}
     """.strip()
 
     doc = Document(
       page_content=page_content,
       metadata={
-        "name": {coffee['bean']},
-        "location": {coffee['Roaster Location']},
-        "origin": {coffee['Coffee Origin']},
-        "roaster": {coffee['roaster']},
-        "roast_level": {coffee['Roast Level']},
-        "agtron": {coffee['agtron']},
-        "aroma": {coffee['Aroma']},
-        "body": {coffee['Body']},
-        "flavor": {coffee['Flavor']},
-        "aftertaste": {coffee['Aftertaste']},
-        "with Milk": {coffee['With Milk']},
-        "acidity/ Structure": {coffee["Acidity/Structure"]},
-        "acidity": {coffee["Acidity"]},
-        "price": {coffee['Est Price']},
-        "review_date": {coffee['Review Date']}
+        "name": coffee.get('bean', ''),
+        "location": coffee.get('Roaster Location', ''),
+        "origin": coffee.get('Coffee Origin', ''),
+        "roaster": coffee.get('roaster', ''),
+        "roast_level": coffee.get('Roast Level', ''),
+        "agtron": coffee.get('Agtron', ''),
+        "aroma": coffee.get('Aroma', ''),
+        "body": coffee.get('Body', ''),
+        "flavor": coffee.get('Flavor', ''),
+        "aftertaste": coffee.get('Aftertaste', ''),
+        "with_milk": coffee.get('With Milk', ''),
+        "acidity/ Structure": coffee.get("Acidity/Structure", ''),
+        "acidity": coffee.get("Acidity", ''),
+        "price": coffee.get('Est Price', ''),
+        "review_date": coffee.get('Review Date', '')
       }
     )
     documents.append(doc)
@@ -146,6 +148,15 @@ def build_vectorstore(reset: bool = False) -> Chroma:
   return vectorstore
 
 def load_vectorstore() -> Chroma:
+  """
+  Loads an existing vectorstore
+
+  Raises:
+    FileNotFoundError: If no ChromaDB directory exists
+
+  Returns:
+    Chroma: ChromaDB instance
+  """
   if not os.path.exists(CHROMA_DIR):
     raise FileNotFoundError(
       "No ChromaDB found. Run: python ingestion.py"
