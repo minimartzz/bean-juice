@@ -22,7 +22,6 @@ from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
-
 from langchain_core.documents import Document
 
 # ========================================
@@ -170,6 +169,7 @@ class RecommendationResponse(BaseModel):
     description="Brief analysis of what the user's preferences reveal about their palate"
   )
 
+
 def build_structured_chain(retriever, llm):
   """
   Structured output forces the LLM to return JSON that conforms to the Pydantic schema.
@@ -217,7 +217,15 @@ def _get_session_history(session_id: str) -> BaseChatMessageHistory:
     _session_store[session_id] = ChatMessageHistory()
   return _session_store[session_id]
 
+
 def build_conversational_chain(retriever, llm):
+  """
+  Builds a conversational LLM which retrieves users message history and injects it
+  into the current chat. Allows the LLM to derive more information based on historical
+  conversations.
+
+  Utilises the _get_session_history and replaces the history variable in the prompt
+  """
   prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a friendly, knowledgeable coffee sommelier. You remeber the
     conversation history and build on previous exchanges. Use the users's evolving preferences
