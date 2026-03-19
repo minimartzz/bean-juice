@@ -70,7 +70,7 @@ def load_coffee_documents() -> List[Document]:
     {coffee.get('Who Should Drink It', '')}
 
     Coffee Details
-    Price: {coffee.get('Est Price', '')}
+    Price: {coffee.get('Est. Price', '')}
     Review Date: {coffee.get('Review Date', '')}
     """.strip()
 
@@ -79,6 +79,7 @@ def load_coffee_documents() -> List[Document]:
       metadata={
         "name": coffee.get('bean', ''),
         "location": coffee.get('Roaster Location', ''),
+        "rating": coffee.get('rating', ''),
         "origin": coffee.get('Coffee Origin', ''),
         "roaster": coffee.get('roaster', ''),
         "roast_level": coffee.get('Roast Level', ''),
@@ -90,7 +91,7 @@ def load_coffee_documents() -> List[Document]:
         "with_milk": coffee.get('With Milk', ''),
         "acidity/ Structure": coffee.get("Acidity/Structure", ''),
         "acidity": coffee.get("Acidity", ''),
-        "price": coffee.get('Est Price', ''),
+        "price": coffee.get('Est. Price', ''),
         "review_date": coffee.get('Review Date', '')
       }
     )
