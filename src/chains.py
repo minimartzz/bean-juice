@@ -45,7 +45,6 @@ format_docs = RunnableLambda(_format_docs)
 # ========================================
 def build_recommendation_chain(retriever, llm):
   """
-  ── Basic LCEL pipe chain ─────────────────────────────────────────────────
   The simplest production-grade RAG chain. Uses only langchain_core.
 
   Data flow:
@@ -100,6 +99,14 @@ Available coffees:
 # 3. User Preference Chain
 # ========================================
 def build_preference_chain(preference_retriever, llm):
+  """
+  Extends basic chain to access input of both question and user's bean
+  preferences. Liked beans can be retrieved from the user profile and dded
+  as context to the prompt.
+
+  Input: {"question": str, "liked_beans": List[str]}
+  Output: str (recommendation text)
+  """
   prompt = ChatPromptTemplate.from_messages([
     ("system", """
 You are an expert coffee sommelier with deep knowledge of
@@ -164,6 +171,88 @@ class RecommendationResponse(BaseModel):
   )
 
 def build_structured_chain(retriever, llm):
+  """
+  Structured output forces the LLM to return JSON that conforms to the Pydantic schema.
+  It uses the model's native function calls to guarantee the output shape 
+
+  Returns a Pydantic object instead of a string. Good for rendering structured data in
+  a UI, or storing in a database. Enable with fallback in case larger models fail
+  """
   structured_llm = llm.with_structured_output(RecommendationResponse)
 
-  prompt
+  prompt = ChatPromptTemplate.from_messages([
+    ("system", """
+    You are a coffee expert. Analyse the user's query and recommend 3-4 coffess from the catalog
+Return structed recommendations.
+
+Available coffees:
+{context}
+    """),
+    ("human", "{question}")
+  ])
+
+  chain = (
+    RunnableParallel({
+      "context": retriever | format_docs,
+      "question": RunnablePassthrough()
+    })
+    | prompt
+    | structured_llm
+  )
+  return chain
+
+# ========================================
+# 5. Memory
+# ========================================
+# In-memory session store
+_session_store: dict[str, BaseChatMessageHistory] = {}
+
+def _get_session_history(session_id: str) -> BaseChatMessageHistory:
+  """
+  Calls function with session_id to retrieve the history of the conversation.
+  Use RunnableWithMessageHistory to instantiate the runner + BaseChatMessageHistory
+  to implement the base
+  """
+  if session_id not in _session_store:
+    _session_store[session_id] = ChatMessageHistory()
+  return _session_store[session_id]
+
+def build_conversational_chain(retriever, llm):
+  prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are a friendly, knowledgeable coffee sommelier. You remeber the
+    conversation history and build on previous exchanges. Use the users's evolving preferences
+    to refine the recommendation over time
+
+    Coffees they've enjoyed: {liked_beans}
+
+    Current context:
+    {context}"""
+    ),
+    # Injects the historical messages here with the key history
+    MessagesPlaceholder(variable_name="history",)
+    ("human", "{question}")
+  ])
+
+  base_chain = (
+    RunnableParallel({
+      "context": retriever | format_docs,
+      "question": lambda x: x['question'],
+      "liked_beans": lambda x: ", ".join(x.get("liked_beans", [])) or "No preference specified yet.",
+      "history": lambda x: x['history']
+    })
+    | prompt
+    | llm
+    | StrOutputParser()
+  )
+
+  # RunnableMessageWithHistory
+  # Wraps the chain and injects the message history and pass new query message down
+  # input_message_key: which input key contains the current users message
+  # history_messages_key: which prompt variable receives the message history
+  conversational_chain = RunnableWithMessageHistory(
+    base_chain,
+    _get_session_history,
+    input_messages_key="question",
+    history_factory_config="history"
+  )
+  return conversational_chain
