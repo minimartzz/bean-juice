@@ -33,7 +33,7 @@ def build_mmr_retriever(vectorstore: Chroma, k: int = 6, lambda_mult: float = 0.
   MMR balances relevance with diversity. Top-k alone might return similar results.
   """
   return vectorstore.as_retriever(
-    search_type="similarity",
+    search_type="mmr",
     search_kwargs={
       "k": k,
       "fetch_k": k * 4,
@@ -118,11 +118,6 @@ def build_preference_aware_retriever(vectorestore: Chroma, k: int = 4):
   """
   Injects the users prefered beans into the context
   """
-  base_retriever = vectorestore.as_retriever(
-    search_type="mmr",
-    search_kwargs={"k": k, "fetch_k": k * 3, "lambda_mult": 0.7}
-  )
-
   def _preference_aware_retriever(inputs: dict) -> List[Document]:
     question = inputs.get("question", "")
     liked_beans = inputs.get("liked_beans", [])
@@ -134,6 +129,23 @@ def build_preference_aware_retriever(vectorestore: Chroma, k: int = 4):
       )
     else:
       preference_context = question
+    
+    fetch_k = k + len(liked_beans)
+    search_kwargs = {"k": fetch_k, "fetch_k": fetch_k * 3, "lambda_mult": 0.7}
+
+    if liked_beans:
+      search_kwargs["filter"] = {"name": {"$nin": liked_beans}}
+    
+    base_retriever = vectorestore.as_retriever(
+      search_type="mmr",
+      search_kwargs=search_kwargs
+    )
+
+    docs = base_retriever.invoke(preference_context)
+
+    # Secondary filter in case $nin doesn't work
+    liked_set = set(liked_beans)
+    filtered = [doc for doc in docs if doc.metadata.get("name") not in liked_set]
     
     return base_retriever.invoke(preference_context)
   

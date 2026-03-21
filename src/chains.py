@@ -119,6 +119,7 @@ When making recommendations:
 - Use sensory language (acidity, body, sweetness, flavor notes)
 - Educate them about why certain origins/processes produce certain flavors
 - Suggest brew methods that will highlight the best qualities
+- DO NOT recommend coffee beans that are in the list of beans the user has enjoyed
 
 Coffees the user has enjoyed: {liked_beans}
 
@@ -237,7 +238,7 @@ def build_conversational_chain(retriever, llm):
     {context}"""
     ),
     # Injects the historical messages here with the key history
-    MessagesPlaceholder(variable_name="history",)
+    MessagesPlaceholder(variable_name="history"),
     ("human", "{question}")
   ])
 
@@ -246,7 +247,7 @@ def build_conversational_chain(retriever, llm):
       "context": retriever | format_docs,
       "question": lambda x: x['question'],
       "liked_beans": lambda x: ", ".join(x.get("liked_beans", [])) or "No preference specified yet.",
-      "history": lambda x: x['history']
+      "history": lambda x: x.get("history", [])
     })
     | prompt
     | llm
@@ -261,6 +262,6 @@ def build_conversational_chain(retriever, llm):
     base_chain,
     _get_session_history,
     input_messages_key="question",
-    history_factory_config="history"
+    history_messages_key="history"
   )
   return conversational_chain
